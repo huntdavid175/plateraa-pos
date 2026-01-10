@@ -398,7 +398,7 @@ export default function POSPage() {
           <OrderSidebar
             orderItems={orderItems}
             orderType={orderType}
-            customer={customer}
+            customer={customer || undefined}
             tableNumber={tableNumber}
             deliveryAddress={deliveryAddress}
             taxRate={TAX_RATE}

@@ -150,13 +150,12 @@ export function CustomerInfoForm({
 
     if (customer) {
       // Update existing customer
-      const updatedCustomer: Customer = {
-        ...customer,
-        name: name.trim(),
-        phone: formattedPhone,
-        email: email.trim() || undefined,
-        updated_at: new Date().toISOString(),
-      };
+          const updatedCustomer: Customer = {
+            ...customer,
+            name: name.trim(),
+            phone: formattedPhone,
+            email: email.trim() || undefined,
+          };
 
       // Update in localStorage
       const allCustomers = getCustomersFromStorage().map((c) =>
