@@ -94,7 +94,7 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="light">
           {children}
           <ToastContainer
-            position="bottom-center"
+            position="top-center"
             autoClose={3000}
             hideProgressBar={false}
             newestOnTop={true}

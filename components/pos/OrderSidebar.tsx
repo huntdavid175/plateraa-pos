@@ -200,34 +200,34 @@ export function OrderSidebar({
                 <button
                   onClick={() => setSelectedPaymentMethod("cash")}
                   className={cn(
-                    "flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all touch-manipulation",
+                    "flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 transition-all touch-manipulation",
                     selectedPaymentMethod === "cash"
                       ? "border-primary bg-primary/10"
                       : "border-border hover:border-primary/50 bg-card"
                   )}
                   aria-pressed={selectedPaymentMethod === "cash"}
                 >
-                  <Banknote className="h-6 w-6 mb-2" />
-                  <span className="text-sm md:text-xs lg:text-sm font-medium">Cash</span>
+                  <Banknote className="h-4 w-4" />
+                  <span className="text-xs font-medium">Cash</span>
                 </button>
                 <button
                   onClick={() => setSelectedPaymentMethod("mobile_money")}
                   className={cn(
-                    "flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all touch-manipulation",
+                    "flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 transition-all touch-manipulation",
                     selectedPaymentMethod === "mobile_money"
                       ? "border-primary bg-primary/10"
                       : "border-border hover:border-primary/50 bg-card"
                   )}
                   aria-pressed={selectedPaymentMethod === "mobile_money"}
                 >
-                  <Smartphone className="h-6 w-6 mb-2" />
-                  <span className="text-sm md:text-xs lg:text-sm font-medium">Mobile Payment</span>
+                  <Smartphone className="h-4 w-4" />
+                  <span className="text-xs font-medium">Mobile</span>
                 </button>
               </div>
 
               {/* Continue Button */}
               <Button
-                className="w-full bg-primary hover:bg-primary/90 h-12 md:h-10 text-base md:text-sm lg:text-base font-medium"
+                className="w-full bg-primary hover:bg-primary/90 h-9 text-sm font-medium"
                 onClick={handleContinue}
                 disabled={!canContinue}
               >
