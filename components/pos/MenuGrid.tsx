@@ -69,9 +69,7 @@ export function MenuGrid({
             <Search className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-base font-medium mb-2">No items found</p>
             <p className="text-xs text-muted-foreground">
-              {searchQuery
-                ? "Try adjusting your search or filters"
-                : "No items available in this category"}
+              No items available in this category
             </p>
           </div>
         ) : (
