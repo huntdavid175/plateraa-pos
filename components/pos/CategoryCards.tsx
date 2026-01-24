@@ -102,7 +102,7 @@ export function CategoryCards({
         onClick={() => onCategorySelect(null)}
         className={cn(
           "flex flex-col items-center justify-center rounded-lg transition-all touch-manipulation flex-shrink-0 shadow-sm",
-          "w-20 h-20 md:w-16 md:h-16 lg:w-20 lg:h-20",
+          "w-24 h-16 md:w-20 md:h-14 lg:w-24 lg:h-16",
           "text-xs md:text-[11px] lg:text-xs font-semibold",
           activeCategoryId === null
             ? `${allColors.activeBg} ${allColors.activeText}`
@@ -132,7 +132,7 @@ export function CategoryCards({
             onClick={() => onCategorySelect(category.id)}
             className={cn(
               "flex flex-col items-center justify-center rounded-lg transition-all touch-manipulation flex-shrink-0 shadow-sm",
-              "w-20 h-20 md:w-16 md:h-16 lg:w-20 lg:h-20",
+              "w-24 h-16 md:w-20 md:h-14 lg:w-24 lg:h-16",
               "text-xs md:text-[11px] lg:text-xs font-semibold",
               isActive
                 ? `${colors.activeBg} ${colors.activeText}`

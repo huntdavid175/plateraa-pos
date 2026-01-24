@@ -3,13 +3,9 @@
 import { MenuItem, MenuCategory, SelectedVariation, SelectedAddOn } from "@/types";
 import { MenuItemCard } from "./MenuItemCard";
 import { CategoryCards } from "./CategoryCards";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Filter, X, ArrowUpDown } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Search } from "lucide-react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-
-type SortOption = "popular" | "price-low" | "price-high" | "name";
 
 interface MenuGridProps {
   items: MenuItem[];
@@ -33,12 +29,7 @@ export function MenuGrid({
   onAddToCart,
   onCategorySelect,
 }: MenuGridProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("popular");
-  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
-
-  // Filter items
+  // Filter items by category
   const filteredItems = useMemo(() => {
     let filtered = items;
 
@@ -49,123 +40,20 @@ export function MenuGrid({
       );
     }
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.name.toLowerCase().includes(query) ||
-          item.description?.toLowerCase().includes(query)
-      );
-    }
-
-    // Availability filter
-    if (showAvailableOnly) {
-      filtered = filtered.filter((item) => item.is_available);
-    }
-
-    // Sort
+    // Sort by featured first, then by name
     const sorted = [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case "popular":
-          // Featured items first, then by name
-          if (a.is_featured && !b.is_featured) return -1;
-          if (!a.is_featured && b.is_featured) return 1;
-          return a.name.localeCompare(b.name);
-        case "price-low":
-          return a.price - b.price;
-        case "price-high":
-          return b.price - a.price;
-        case "name":
-          return a.name.localeCompare(b.name);
-        default:
-          return 0;
-      }
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      return a.name.localeCompare(b.name);
     });
 
     return sorted;
-  }, [items, activeCategoryId, searchQuery, showAvailableOnly, sortBy]);
-
-  const activeCategory = categories.find((c) => c.id === activeCategoryId);
+  }, [items, activeCategoryId]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search and Filter Bar */}
-      <div className="p-4 border-b space-y-3 bg-background">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 text-xs md:text-xs lg:text-sm"
-              aria-label="Search menu items"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-12 w-12"
-            onClick={() => setShowFilters(!showFilters)}
-            aria-label="Toggle filters"
-            aria-pressed={showFilters}
-          >
-            <Filter className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="space-y-3 pt-2 border-t">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium">Sort by:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="flex-1 h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Sort menu items"
-              >
-                <option value="popular">Popular</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name">Name: A-Z</option>
-              </select>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer touch-manipulation">
-              <input
-                type="checkbox"
-                checked={showAvailableOnly}
-                onChange={(e) => setShowAvailableOnly(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-                aria-label="Show available items only"
-              />
-              <span className="text-xs">Show available items only</span>
-            </label>
-          </div>
-        )}
-
-        {/* Active Category Badge */}
-        {activeCategory && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Category:</span>
-            <span className="text-xs font-medium">{activeCategory.name}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.location.reload()}
-              className="h-6 px-2"
-              aria-label="Clear category filter"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </div>
-
       {/* Category Cards - Horizontal */}
-      <div className="pt-4 border-b bg-background">
+      <div className="p-4 border-b bg-background">
         <CategoryCards
           categories={categories}
           activeCategoryId={activeCategoryId}
