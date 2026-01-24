@@ -342,7 +342,7 @@ export default function POSPage() {
       <header className="border-b bg-card px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Navigation />
-          <h1 className="text-xl font-bold">Plateraa POS</h1>
+          <h1 className="text-base md:text-sm lg:text-base font-bold">Plateraa POS</h1>
         </div>
         <div className="flex items-center gap-4">
           <button

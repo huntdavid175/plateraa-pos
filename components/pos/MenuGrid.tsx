@@ -100,7 +100,7 @@ export function MenuGrid({
               placeholder="Search menu..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-12 text-base"
+              className="pl-10 h-10 text-xs md:text-xs lg:text-sm"
               aria-label="Search menu items"
             />
           </div>
@@ -120,11 +120,11 @@ export function MenuGrid({
         {showFilters && (
           <div className="space-y-3 pt-2 border-t">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Sort by:</label>
+              <label className="text-xs font-medium">Sort by:</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex-1 h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Sort menu items"
               >
                 <option value="popular">Popular</option>
@@ -141,7 +141,7 @@ export function MenuGrid({
                 className="h-4 w-4 rounded border-gray-300"
                 aria-label="Show available items only"
               />
-              <span className="text-sm">Show available items only</span>
+              <span className="text-xs">Show available items only</span>
             </label>
           </div>
         )}
@@ -149,8 +149,8 @@ export function MenuGrid({
         {/* Active Category Badge */}
         {activeCategory && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Category:</span>
-            <span className="text-sm font-medium">{activeCategory.name}</span>
+            <span className="text-xs text-muted-foreground">Category:</span>
+            <span className="text-xs font-medium">{activeCategory.name}</span>
             <Button
               variant="ghost"
               size="sm"
@@ -179,8 +179,8 @@ export function MenuGrid({
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">
             <Search className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium mb-2">No items found</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base font-medium mb-2">No items found</p>
+            <p className="text-xs text-muted-foreground">
               {searchQuery
                 ? "Try adjusting your search or filters"
                 : "No items available in this category"}
@@ -207,7 +207,7 @@ export function MenuGrid({
       {/* Results Count */}
       {filteredItems.length > 0 && (
         <div className="px-4 py-2 border-t bg-muted/50">
-          <p className="text-sm text-muted-foreground text-center">
+          <p className="text-xs text-muted-foreground text-center">
             Showing {filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""}
           </p>
         </div>

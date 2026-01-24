@@ -114,7 +114,7 @@ export function OrderSidebar({
   return (
     <div className="flex flex-col h-full border-l bg-card">
       <div className="p-4 border-b">
-        <h2 className="text-xl font-bold mb-4">Order Details</h2>
+        <h2 className="text-xl md:text-lg lg:text-xl font-bold mb-4">Order Details</h2>
 
         {/* Order Type Tabs */}
         <Tabs
@@ -140,7 +140,7 @@ export function OrderSidebar({
           {/* Order Items */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">
+              <h3 className="font-semibold text-sm md:text-xs lg:text-sm">
                 Ordered Items ({orderItems.length})
               </h3>
             </div>
@@ -176,18 +176,18 @@ export function OrderSidebar({
       {orderItems.length > 0 && (
         <div className="border-t bg-background p-4 space-y-4">
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm md:text-xs lg:text-sm">
               <span className="text-muted-foreground">Subtotal:</span>
               <span className="font-medium">₵{subtotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm md:text-xs lg:text-sm">
               <span className="text-muted-foreground">
                 Taxes ({Math.round(taxRate * 100)}%):
               </span>
               <span className="font-medium">₵{taxAmount.toLocaleString()}</span>
             </div>
             <Separator />
-            <div className="flex justify-between text-lg font-bold">
+            <div className="flex justify-between text-lg md:text-base lg:text-lg font-bold">
               <span>Total:</span>
               <span className="text-primary">₵{total.toLocaleString()}</span>
             </div>
@@ -208,7 +208,7 @@ export function OrderSidebar({
                   aria-pressed={selectedPaymentMethod === "cash"}
                 >
                   <Banknote className="h-6 w-6 mb-2" />
-                  <span className="text-sm font-medium">Cash</span>
+                  <span className="text-sm md:text-xs lg:text-sm font-medium">Cash</span>
                 </button>
                 <button
                   onClick={() => setSelectedPaymentMethod("mobile_money")}
@@ -221,13 +221,13 @@ export function OrderSidebar({
                   aria-pressed={selectedPaymentMethod === "mobile_money"}
                 >
                   <Smartphone className="h-6 w-6 mb-2" />
-                  <span className="text-sm font-medium">Mobile Payment</span>
+                  <span className="text-sm md:text-xs lg:text-sm font-medium">Mobile Payment</span>
                 </button>
               </div>
 
               {/* Continue Button */}
               <Button
-                className="w-full bg-primary hover:bg-primary/90 h-12 text-base font-medium"
+                className="w-full bg-primary hover:bg-primary/90 h-12 md:h-10 text-base md:text-sm lg:text-base font-medium"
                 onClick={handleContinue}
                 disabled={!canContinue}
               >

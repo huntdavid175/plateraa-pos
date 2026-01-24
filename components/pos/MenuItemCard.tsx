@@ -105,21 +105,16 @@ export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <h3 className="font-semibold text-base mb-1 line-clamp-2">
+      <div className="p-3">
+        <h3 className="font-semibold text-xs md:text-[10px] lg:text-xs mb-2 line-clamp-2">
           {item.name}
         </h3>
-        {item.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-            {item.description}
-          </p>
-        )}
         <div className="flex items-center justify-between">
-          <span className="text-lg font-bold text-primary">
+          <span className="text-sm md:text-xs lg:text-sm font-bold text-primary">
             ₵{item.price.toLocaleString()}
           </span>
           {item.preparation_time && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[10px] md:text-[8px] lg:text-[10px] text-muted-foreground">
               {item.preparation_time} min
             </span>
           )}

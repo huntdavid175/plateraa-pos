@@ -66,7 +66,7 @@ export function OrderItem({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <h4 className="font-semibold text-sm line-clamp-1">
+          <h4 className="font-semibold text-sm md:text-xs lg:text-sm line-clamp-1">
             {item.menu_item.name}
           </h4>
           <Button
@@ -107,10 +107,10 @@ export function OrderItem({
         )}
 
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-primary">
+          <span className="text-sm md:text-xs lg:text-sm font-medium text-primary">
             ₵{item.subtotal.toLocaleString()}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs md:text-[0.65rem] lg:text-xs text-muted-foreground">
             ₵{item.price.toLocaleString()} each
           </span>
         </div>
@@ -126,7 +126,7 @@ export function OrderItem({
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-sm font-medium w-8 text-center">
+          <span className="text-sm md:text-xs lg:text-sm font-medium w-8 text-center">
             {item.quantity}
           </span>
           <Button

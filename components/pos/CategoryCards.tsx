@@ -2,38 +2,70 @@
 
 import { MenuCategory, MenuItem } from "@/types";
 import { cn } from "@/lib/utils";
-import {
-  Utensils,
-  Soup,
-  Coffee,
-  Salad,
-  Grid3x3,
-  Egg,
-  UtensilsCrossed,
-  Drumstick,
-  Wine,
-} from "lucide-react";
+import { Grid3x3 } from "lucide-react";
 
-const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  appetizer: Utensils,
-  soup: Soup,
-  beverages: Coffee,
-  salad: Salad,
-  breakfast: Egg,
-  lunch: UtensilsCrossed,
-  dinner: Drumstick,
-  beverage: Wine,
-  default: Utensils,
-};
-
-// Category colors matching the reference
-const categoryColors: Record<string, string> = {
-  all: "bg-blue-200", // Blue for "All"
-  appetizer: "bg-white",
-  soup: "bg-white",
-  beverages: "bg-white",
-  salad: "bg-white",
-  default: "bg-white",
+// Category colors with different colors for each category
+const categoryColors: Record<string, { bg: string; text: string; activeBg: string; activeText: string }> = {
+  all: { 
+    bg: "bg-blue-100 dark:bg-blue-900/20", 
+    text: "text-blue-700 dark:text-blue-300",
+    activeBg: "bg-blue-500 dark:bg-blue-600",
+    activeText: "text-white"
+  },
+  appetizer: { 
+    bg: "bg-red-100 dark:bg-red-900/20", 
+    text: "text-red-700 dark:text-red-300",
+    activeBg: "bg-red-500 dark:bg-red-600",
+    activeText: "text-white"
+  },
+  soup: { 
+    bg: "bg-amber-100 dark:bg-amber-900/20", 
+    text: "text-amber-700 dark:text-amber-300",
+    activeBg: "bg-amber-500 dark:bg-amber-600",
+    activeText: "text-white"
+  },
+  beverages: { 
+    bg: "bg-purple-100 dark:bg-purple-900/20", 
+    text: "text-purple-700 dark:text-purple-300",
+    activeBg: "bg-purple-500 dark:bg-purple-600",
+    activeText: "text-white"
+  },
+  salad: { 
+    bg: "bg-green-100 dark:bg-green-900/20", 
+    text: "text-green-700 dark:text-green-300",
+    activeBg: "bg-green-500 dark:bg-green-600",
+    activeText: "text-white"
+  },
+  beverage: {
+    bg: "bg-cyan-100 dark:bg-cyan-900/20",
+    text: "text-cyan-700 dark:text-cyan-300",
+    activeBg: "bg-cyan-500 dark:bg-cyan-600",
+    activeText: "text-white"
+  },
+  breakfast: { 
+    bg: "bg-orange-100 dark:bg-orange-900/20", 
+    text: "text-orange-700 dark:text-orange-300",
+    activeBg: "bg-orange-500 dark:bg-orange-600",
+    activeText: "text-white"
+  },
+  lunch: { 
+    bg: "bg-pink-100 dark:bg-pink-900/20", 
+    text: "text-pink-700 dark:text-pink-300",
+    activeBg: "bg-pink-500 dark:bg-pink-600",
+    activeText: "text-white"
+  },
+  dinner: { 
+    bg: "bg-indigo-100 dark:bg-indigo-900/20", 
+    text: "text-indigo-700 dark:text-indigo-300",
+    activeBg: "bg-indigo-500 dark:bg-indigo-600",
+    activeText: "text-white"
+  },
+  default: { 
+    bg: "bg-gray-100 dark:bg-gray-800", 
+    text: "text-gray-700 dark:text-gray-300",
+    activeBg: "bg-gray-500 dark:bg-gray-600",
+    activeText: "text-white"
+  },
 };
 
 interface CategoryCardsProps {
@@ -61,63 +93,60 @@ export function CategoryCards({
     return menuItems.filter((item) => item.category_id === categoryId).length;
   };
 
+  const allColors = categoryColors.all;
+  
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 px-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+    <div className="flex gap-2 overflow-x-auto pb-2 px-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
       {/* All Menu Card */}
       <button
         onClick={() => onCategorySelect(null)}
         className={cn(
-          "flex flex-col items-center justify-center p-5 rounded-xl transition-all touch-manipulation min-w-[140px] flex-shrink-0 shadow-md",
+          "flex flex-col items-center justify-center rounded-lg transition-all touch-manipulation flex-shrink-0 shadow-sm",
+          "w-20 h-20 md:w-16 md:h-16 lg:w-20 lg:h-20",
+          "text-xs md:text-[11px] lg:text-xs font-semibold",
           activeCategoryId === null
-            ? "bg-blue-200 dark:bg-blue-900/30"
-            : "bg-white dark:bg-card border border-gray-200 dark:border-border hover:shadow-lg"
+            ? `${allColors.activeBg} ${allColors.activeText}`
+            : `${allColors.bg} ${allColors.text} hover:shadow-md`
         )}
         aria-label="View all menu items"
         aria-pressed={activeCategoryId === null}
       >
-        <Grid3x3 className={cn(
-          "h-8 w-8 mb-3",
-          activeCategoryId === null ? "text-black dark:text-white" : "text-blue-500 dark:text-blue-400"
-        )} />
-        <span className="text-base font-bold mb-1 text-black dark:text-foreground">
-          All
-        </span>
-        <span className="text-xs text-black/70 dark:text-muted-foreground font-normal">
-          {getItemCount(null)}+ items
+        <span>All</span>
+        <span className={cn(
+          "text-xs mt-1 opacity-75",
+          activeCategoryId === null ? allColors.activeText : allColors.text
+        )}>
+          {getItemCount(null)}
         </span>
       </button>
 
       {/* Category Cards */}
-      {sortedCategories.map((category, index) => {
-        const Icon =
-          categoryIcons[category.slug.toLowerCase()] ||
-          categoryIcons.default;
+      {sortedCategories.map((category) => {
         const isActive = activeCategoryId === category.id;
         const itemCount = getItemCount(category.id);
-        const colorClass = categoryColors[category.slug.toLowerCase()] || categoryColors.default;
+        const colors = categoryColors[category.slug.toLowerCase()] || categoryColors.default;
 
         return (
           <button
             key={category.id}
             onClick={() => onCategorySelect(category.id)}
             className={cn(
-              "flex flex-col items-center justify-center p-5 rounded-xl transition-all touch-manipulation min-w-[140px] flex-shrink-0 shadow-md",
+              "flex flex-col items-center justify-center rounded-lg transition-all touch-manipulation flex-shrink-0 shadow-sm",
+              "w-20 h-20 md:w-16 md:h-16 lg:w-20 lg:h-20",
+              "text-xs md:text-[11px] lg:text-xs font-semibold",
               isActive
-                ? "bg-blue-200 dark:bg-blue-900/30"
-                : "bg-white dark:bg-card border border-gray-200 dark:border-border hover:shadow-lg"
+                ? `${colors.activeBg} ${colors.activeText}`
+                : `${colors.bg} ${colors.text} hover:shadow-md`
             )}
             aria-label={`View ${category.name} category`}
             aria-pressed={isActive}
           >
-            <Icon className={cn(
-              "h-8 w-8 mb-3",
-              isActive ? "text-black dark:text-white" : "text-blue-500 dark:text-blue-400"
-            )} />
-            <span className="text-base font-bold mb-1 text-black dark:text-foreground">
-              {category.name}
-            </span>
-            <span className="text-xs text-black/70 dark:text-muted-foreground font-normal">
-              {itemCount} items
+            <span className="text-center line-clamp-1">{category.name}</span>
+            <span className={cn(
+              "text-xs mt-1 opacity-75",
+              isActive ? colors.activeText : colors.text
+            )}>
+              {itemCount}
             </span>
           </button>
         );
