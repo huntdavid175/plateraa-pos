@@ -202,8 +202,8 @@ export function OrderSidebar({
                   className={cn(
                     "flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 transition-all touch-manipulation",
                     selectedPaymentMethod === "cash"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50 bg-card"
+                      ? "border-blue-500 bg-blue-500/90 text-white shadow-md"
+                      : "border-border hover:border-blue-300 bg-card text-muted-foreground"
                   )}
                   aria-pressed={selectedPaymentMethod === "cash"}
                 >
@@ -215,8 +215,8 @@ export function OrderSidebar({
                   className={cn(
                     "flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 transition-all touch-manipulation",
                     selectedPaymentMethod === "mobile_money"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50 bg-card"
+                      ? "border-blue-500 bg-blue-500/90 text-white shadow-md"
+                      : "border-border hover:border-blue-300 bg-card text-muted-foreground"
                   )}
                   aria-pressed={selectedPaymentMethod === "mobile_money"}
                 >
@@ -294,6 +294,12 @@ export function OrderSidebar({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setCustomerPhone(e.target.value)
                 }
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
                 placeholder="+233 24 000 0000"
                 className="h-12 text-base"
                 required
