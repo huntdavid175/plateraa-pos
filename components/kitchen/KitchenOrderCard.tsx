@@ -61,7 +61,12 @@ const statusConfig: Record<
 };
 
 export function KitchenOrderCard({ order, onStatusUpdate }: KitchenOrderCardProps) {
-  const config = statusConfig[order.status];
+  const config =
+    statusConfig[order.status] ??
+    ({
+      label: order.status || "Unknown",
+      color: "bg-gray-500",
+    } as const);
   const timeAgo = formatDistanceToNow(new Date(order.created_at), { addSuffix: true });
 
   const getOrderTypeIcon = () => {
@@ -148,14 +153,27 @@ export function KitchenOrderCard({ order, onStatusUpdate }: KitchenOrderCardProp
             key={item.id}
             className="bg-muted/50 p-2 rounded text-sm"
           >
+            {/*
+              Some orders from the database may not have a full `menu_item` object.
+              Fall back to a plain `name` field if needed.
+            */}
+            {(() => {
+              const itemName =
+                item.menu_item?.name ?? (item as any).name ?? "Item";
+              const itemSubtotal =
+                item.subtotal ?? (item as any).price ?? 0;
+
+              return (
             <div className="flex items-center justify-between mb-1">
               <span className="font-medium">
-                {item.quantity}x {item.menu_item.name}
+                    {item.quantity}x {itemName}
               </span>
               <span className="text-muted-foreground">
-                ₵{item.subtotal.toLocaleString()}
+                    ₵{Number(itemSubtotal).toLocaleString()}
               </span>
             </div>
+              );
+            })()}
             {item.selected_variations && item.selected_variations.length > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
                 {item.selected_variations.map((v) => (
