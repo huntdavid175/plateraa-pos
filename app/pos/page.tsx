@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { MenuItem, MenuCategory, OrderItem, OrderType, Customer, SelectedVariation, SelectedAddOn } from "@/types";
-import { mockCategories, mockMenuItems } from "@/lib/mock-data";
+import { useState, useEffect, useCallback, FormEvent } from "react";
+import {
+  MenuItem,
+  MenuCategory,
+  OrderItem,
+  OrderType,
+  Customer,
+  SelectedVariation,
+  SelectedAddOn,
+  Variation,
+} from "@/types";
 import { MenuGrid } from "@/components/pos/MenuGrid";
 import { OrderSidebar } from "@/components/pos/OrderSidebar";
 import { BoltFoodOrderNotification } from "@/components/pos/BoltFoodOrderNotification";
@@ -10,10 +18,19 @@ import { toast } from "react-toastify";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Navigation } from "@/components/shared/Navigation";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+
+const INSTITUTION_ID_STORAGE_KEY = "plateraa_institution_id";
 
 export default function POSPage() {
-  const [menuItems] = useState<MenuItem[]>(mockMenuItems);
-  const [categories] = useState<MenuCategory[]>(mockCategories);
+  const [institutionId, setInstitutionId] = useState<string | null>(null);
+  const [isCheckingInstitution, setIsCheckingInstitution] = useState(true);
+  const [institutionCode, setInstitutionCode] = useState("");
+  const [isResolvingInstitution, setIsResolvingInstitution] = useState(false);
+
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<OrderType>("dine-in");
@@ -23,6 +40,219 @@ export default function POSPage() {
   const [boltFoodOrders, setBoltFoodOrders] = useState<any[]>([]);
 
   const TAX_RATE = 0.1; // 10% tax
+
+  const handleInstitutionLogout = useCallback(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(INSTITUTION_ID_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error("Error clearing institution id from localStorage", error);
+    }
+
+    // Reset institution-scoped state
+    setInstitutionId(null);
+    setMenuItems([]);
+    setCategories([]);
+
+    toast.success("Logged out: You can connect a different restaurant");
+  }, []);
+
+  // Check for stored institution ID on first load
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const storedId = window.localStorage.getItem(
+          INSTITUTION_ID_STORAGE_KEY
+        );
+        if (storedId) {
+          setInstitutionId(storedId);
+        }
+      }
+    } catch (error) {
+      console.error("Error reading institution id from localStorage", error);
+    } finally {
+      setIsCheckingInstitution(false);
+    }
+  }, []);
+
+  // Resolve institution code -> institution id and store it
+  const handleResolveInstitution = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+
+      const code = institutionCode.trim();
+      if (!code) {
+        toast.error("Institution Code Required: Please enter your code");
+        return;
+      }
+
+      try {
+        setIsResolvingInstitution(true);
+
+        const { data, error } = await supabase
+          .from("institution_codes")
+          .select("institution_id")
+          .eq("code", code)
+          .single();
+
+        if (error || !data?.institution_id) {
+          console.error("Error resolving institution code", error);
+          toast.error(
+            "Invalid Code: We couldn't find an institution for that code"
+          );
+          return;
+        }
+
+        const resolvedId = data.institution_id as string;
+
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(
+              INSTITUTION_ID_STORAGE_KEY,
+              resolvedId
+            );
+          }
+        } catch (storageError) {
+          console.error(
+            "Error saving institution id to localStorage",
+            storageError
+          );
+        }
+
+        setInstitutionId(resolvedId);
+        toast.success("Institution Connected: Menu will load shortly");
+      } finally {
+        setIsResolvingInstitution(false);
+      }
+    },
+    [institutionCode]
+  );
+
+  // Fetch categories and menu items for the resolved institution
+  useEffect(() => {
+    if (!institutionId) return;
+
+    const fetchMenuData = async () => {
+      try {
+        setIsLoadingMenu(true);
+
+        // Fetch categories
+        const { data: categoryRows, error: categoryError } = await supabase
+          .from("menu_categories")
+          .select("*")
+          .eq("institution_id", institutionId)
+          .eq("is_visible", true)
+          .order("sort_order");
+
+        if (categoryError) {
+          console.error("Error fetching menu categories", categoryError);
+          toast.error("Failed to load menu categories");
+        } else if (categoryRows) {
+          const mappedCategories: MenuCategory[] = categoryRows.map(
+            (cat: any) => ({
+              id: cat.id,
+              name: cat.name,
+              slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, "-"),
+              icon: cat.icon || undefined,
+              display_order: cat.sort_order ?? 0,
+              created_at: cat.created_at,
+            })
+          );
+          setCategories(mappedCategories);
+        }
+
+        // Fetch menu items with variants and addons
+        const { data: itemRows, error: itemError } = await supabase
+          .from("menu_items")
+          .select(
+            `
+            *,
+            menu_item_variants (id, name, price, sort_order, is_default),
+            menu_item_addons (id, name, price, sort_order, is_available)
+          `
+          )
+          .eq("institution_id", institutionId)
+          .eq("is_available", true)
+          .order("created_at", { ascending: true });
+
+        if (itemError) {
+          console.error("Error fetching menu items", itemError);
+          toast.error("Failed to load menu items");
+          return;
+        }
+
+        if (!itemRows) {
+          setMenuItems([]);
+          return;
+        }
+
+        const mappedItems: MenuItem[] = itemRows.map((row: any) => {
+          let variations: Variation[] | undefined;
+
+          if (row.menu_item_variants && row.menu_item_variants.length > 0) {
+            // Map Supabase variants into a single variation group called "Variant"
+            const basePrice = Number(row.price ?? 0);
+            variations = [
+              {
+                id: `var-${row.id}`,
+                name: "Variant",
+                required: true,
+                options: row.menu_item_variants
+                  .sort(
+                    (a: any, b: any) =>
+                      (a.sort_order ?? 0) - (b.sort_order ?? 0)
+                  )
+                  .map((variant: any) => ({
+                    id: variant.id,
+                    name: variant.name,
+                    price_modifier:
+                      Number(variant.price ?? basePrice) - basePrice,
+                  })),
+              },
+            ];
+          }
+
+          const add_ons =
+            row.menu_item_addons && row.menu_item_addons.length > 0
+              ? row.menu_item_addons
+                  .filter((addon: any) => addon.is_available !== false)
+                  .sort(
+                    (a: any, b: any) =>
+                      (a.sort_order ?? 0) - (b.sort_order ?? 0)
+                  )
+                  .map((addon: any) => ({
+                    id: addon.id,
+                    name: addon.name,
+                    price: Number(addon.price ?? 0),
+                  }))
+              : undefined;
+
+          return {
+            id: row.id,
+            name: row.name,
+            description: row.description ?? undefined,
+            price: Number(row.price ?? 0),
+            image_url: row.image_url ?? undefined,
+            category_id: row.category_id,
+            is_available: row.is_available ?? true,
+            is_featured: row.is_featured ?? false,
+            preparation_time: row.preparation_time ?? undefined,
+            variations,
+            add_ons,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          } as MenuItem;
+        });
+
+        setMenuItems(mappedItems);
+      } finally {
+        setIsLoadingMenu(false);
+      }
+    };
+
+    fetchMenuData();
+  }, [institutionId]);
 
   // Simulate incoming Bolt Food orders (for demo purposes)
   useEffect(() => {
@@ -336,6 +566,61 @@ export default function POSPage() {
     toast.success("Order created and payment link sent");
   }, [orderItems, TAX_RATE]);
 
+  if (isCheckingInstitution) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <span className="text-sm text-muted-foreground">
+          Loading restaurant configuration...
+        </span>
+      </div>
+    );
+  }
+
+  if (!institutionId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
+          <h1 className="mb-2 text-base font-semibold">
+            Connect Restaurant
+          </h1>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Enter your institution code to load the correct menu for this
+            device.
+          </p>
+          <form onSubmit={handleResolveInstitution} className="space-y-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="institution-code"
+                className="text-xs font-medium text-foreground"
+              >
+                Institution Code
+              </label>
+              <input
+                id="institution-code"
+                type="text"
+                value={institutionCode}
+                onChange={(e) => setInstitutionCode(e.target.value)}
+                className="w-full rounded-md border bg-background px-3 py-2 text-xs outline-none ring-0 focus-visible:border-primary"
+                placeholder="e.g. BRANCH-1234"
+                autoComplete="off"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isResolvingInstitution}
+              className={cn(
+                "w-full rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors",
+                isResolvingInstitution && "opacity-70 cursor-not-allowed"
+              )}
+            >
+              {isResolvingInstitution ? "Connecting..." : "Connect"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -345,6 +630,13 @@ export default function POSPage() {
           <h1 className="text-base md:text-sm lg:text-base font-bold">Plateraa POS</h1>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={handleInstitutionLogout}
+            className="hidden md:inline-flex px-3 py-1.5 text-[11px] rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Logout / Change Restaurant
+          </button>
           <button
             onClick={() => {
               setBoltFoodOrders((prev) => [
