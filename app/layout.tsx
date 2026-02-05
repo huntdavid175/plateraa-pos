@@ -4,6 +4,7 @@ import "./globals.css";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { RealtimeProvider } from "@/contexts/RealtimeContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -92,19 +93,21 @@ export default function RootLayout({
           }}
         />
         <ThemeProvider defaultTheme="light">
-          {children}
-          <ToastContainer
-            position="top-center"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={true}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
+          <RealtimeProvider>
+            {children}
+            <ToastContainer
+              position="top-center"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop={true}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
+          </RealtimeProvider>
         </ThemeProvider>
       </body>
     </html>

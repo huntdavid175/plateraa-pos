@@ -11,16 +11,39 @@ import { Search, Filter } from "lucide-react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { useRealtime } from "@/contexts/RealtimeContext";
+import { BoltFoodOrderNotification } from "@/components/pos/BoltFoodOrderNotification";
 
 type OrderStatusFilter = "all" | "pending" | "preparing" | "ready" | "completed";
+
+type NotificationOrder = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  estimatedDeliveryTime: number;
+  createdAt: string;
+};
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>("all");
+  const [notificationOrders, setNotificationOrders] = useState<NotificationOrder[]>([]);
+  const { subscribeToOrders } = useRealtime();
 
   // Map UI order status to DB status enum used in `orders` and `order_timeline`
+  // Database enum values: pending, paid, preparing, ready, dispatched, delivered, cancelled
   const mapUiStatusToDbStatus = (
     status: Order["status"]
   ):
@@ -28,6 +51,7 @@ export default function KitchenPage() {
     | "paid"
     | "preparing"
     | "ready"
+    | "dispatched"
     | "delivered"
     | "cancelled" => {
     switch (status) {
@@ -40,7 +64,7 @@ export default function KitchenPage() {
       case "ready":
         return "ready";
       case "completed":
-        return "delivered";
+        return "delivered"; // UI "completed" maps to DB "delivered"
       case "cancelled":
         return "cancelled";
       default:
@@ -89,6 +113,9 @@ export default function KitchenPage() {
           )
         `
         )
+        // Show orders that are pending, paid, or already in the kitchen workflow
+        // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
+        .in("status", ["pending", "paid", "preparing", "ready", "dispatched", "delivered"])
         .gte("created_at", startIso)
         .lte("created_at", endIso)
         .order("created_at", { ascending: false });
@@ -220,11 +247,13 @@ export default function KitchenPage() {
           (row.status === "paid" ? "paid" : "pending");
 
         // Map external status values to our internal union
+        // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
         const rawStatus = (row.status || "") as
           | "pending"
           | "paid"
           | "preparing"
           | "ready"
+          | "dispatched"
           | "delivered"
           | "cancelled"
           | string;
@@ -238,6 +267,8 @@ export default function KitchenPage() {
             ? "preparing"
             : rawStatus === "ready"
             ? "ready"
+            : rawStatus === "dispatched"
+            ? "ready" // Map "dispatched" to "ready" in UI (still active, needs attention)
             : rawStatus === "delivered"
             ? "completed"
             : rawStatus === "cancelled"
@@ -274,6 +305,104 @@ export default function KitchenPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  const queueNotificationForOrder = useCallback(async (orderId: string) => {
+    // Fetch a single order with related data to build the notification payload
+    const { data, error } = await supabase
+      .from("orders")
+      .select(
+        `
+        *,
+        customers (*),
+        order_items (*)
+      `
+      )
+      .eq("id", orderId)
+      .single();
+
+    if (error || !data) return;
+
+    const row: any = data;
+
+    const items = Array.isArray(row.order_items)
+      ? row.order_items.map((item: any) => ({
+          name: (item.item_name as string) ?? "Item",
+          quantity: Number(item.quantity ?? 1),
+          price: Number(item.unit_price ?? 0),
+        }))
+      : [];
+
+    const notificationOrder: NotificationOrder = {
+      id: row.id as string,
+      orderNumber: row.order_number as string,
+      customerName: (row.customer_name as string) ?? "Customer",
+      customerPhone: (row.customer_phone as string) ?? "",
+      deliveryAddress: (row.delivery_address as string) ?? "",
+      items,
+      subtotal: Number(row.subtotal ?? 0),
+      deliveryFee: Number(row.delivery_fee ?? 0),
+      total: Number(row.total_amount ?? 0),
+      estimatedDeliveryTime: 30,
+      createdAt: row.created_at as string,
+    };
+
+    setNotificationOrders((prev) => {
+      // Avoid duplicates
+      if (prev.some((o) => o.id === notificationOrder.id)) return prev;
+      return [...prev, notificationOrder];
+    });
+  }, []);
+
+  // Subscribe to global realtime updates for orders
+  useEffect(() => {
+    const unsubscribe = subscribeToOrders(async (payload: any) => {
+      const eventType = payload.eventType; // 'INSERT' or 'UPDATE' or 'DELETE'
+      const newRow = payload.new as any | null;
+      const oldRow = payload.old as any | null;
+
+      if (!newRow) return;
+
+      // Only react to orders that are paid or already in the kitchen workflow
+      // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
+      const status = newRow.status as
+        | "pending"
+        | "paid"
+        | "preparing"
+        | "ready"
+        | "dispatched"
+        | "delivered"
+        | "cancelled"
+        | string;
+
+      const isActiveStatus =
+        status === "paid" ||
+        status === "preparing" ||
+        status === "ready" ||
+        status === "dispatched" ||
+        status === "delivered";
+
+      if (!isActiveStatus) {
+        return;
+      }
+
+      // If an order just became paid (either new INSERT with paid status, or UPDATE from non-paid to paid), queue a notification.
+      const wasPreviouslyPaid = oldRow?.status === "paid";
+      const isNowPaid = status === "paid";
+      const isNewOrder = eventType === "INSERT";
+
+      // Show notification if:
+      // 1. It's a new order (INSERT) with status "paid", OR
+      // 2. It's an UPDATE where status changed from non-paid to "paid"
+      if (isNowPaid && (isNewOrder || !wasPreviouslyPaid)) {
+        await queueNotificationForOrder(newRow.id as string);
+      }
+
+      // Re-fetch today's relevant orders so the grid stays up to date
+      fetchOrders();
+    });
+
+    return unsubscribe;
+  }, [subscribeToOrders, fetchOrders, queueNotificationForOrder]);
 
   // Filter and search orders
   const filteredOrders = useMemo(() => {
@@ -321,15 +450,36 @@ export default function KitchenPage() {
         )
       );
 
-      const dbStatus = mapUiStatusToDbStatus(newStatus);
+      // Map UI status to DB enum - CRITICAL: never send "completed" or "confirmed" to database
+      // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
+      // Use a function to ensure type safety and prevent any "completed" value from being sent
+      const getDbStatus = (uiStatus: Order["status"]): "pending" | "paid" | "preparing" | "ready" | "dispatched" | "delivered" | "cancelled" => {
+        const mapping: Record<Order["status"], "pending" | "paid" | "preparing" | "ready" | "dispatched" | "delivered" | "cancelled"> = {
+          pending: "pending",
+          confirmed: "paid",
+          preparing: "preparing",
+          ready: "ready",
+          completed: "delivered", // UI "completed" maps to DB "delivered"
+          cancelled: "cancelled",
+        };
+        return mapping[uiStatus] || "pending";
+      };
+      
+      const validDbStatus = getDbStatus(newStatus);
       const nowIso = new Date().toISOString();
+
+      // Create update object with explicit typing to prevent any "completed" value
+      const updatePayload: {
+        status: "pending" | "paid" | "preparing" | "ready" | "dispatched" | "delivered" | "cancelled";
+        updated_at: string;
+      } = {
+        status: validDbStatus,
+        updated_at: nowIso,
+      };
 
       const { error: orderError } = await supabase
         .from("orders")
-        .update({
-          status: dbStatus,
-          updated_at: nowIso,
-        })
+        .update(updatePayload)
         .eq("id", orderId);
 
       if (orderError) {
@@ -346,10 +496,10 @@ export default function KitchenPage() {
       }
 
       // Best-effort: record status change in order_timeline
-      const eventDescription = `Status changed to "${dbStatus}" from kitchen`;
+      const eventDescription = `Status changed to "${validDbStatus}" from kitchen`;
       const { error: timelineError } = await supabase.from("order_timeline").insert({
         order_id: orderId,
-        event_type: dbStatus,
+        event_type: validDbStatus,
         event_description: eventDescription,
       });
 
@@ -422,10 +572,20 @@ export default function KitchenPage() {
                 All ({counts.all})
               </TabsTrigger>
               <TabsTrigger value="pending" className="text-xs sm:text-sm">
-                Pending ({counts.pending})
+                <span className="relative inline-flex items-center gap-1">
+                  Pending ({counts.pending})
+                  {counts.pending > 0 && (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                </span>
               </TabsTrigger>
               <TabsTrigger value="preparing" className="text-xs sm:text-sm">
-                Preparing ({counts.preparing})
+                <span className="relative inline-flex items-center gap-1">
+                  Preparing ({counts.preparing})
+                  {counts.preparing > 0 && (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                </span>
               </TabsTrigger>
               <TabsTrigger value="ready" className="text-xs sm:text-sm">
                 Ready ({counts.ready})
@@ -462,6 +622,16 @@ export default function KitchenPage() {
           )}
         </div>
       </div>
+
+      <BoltFoodOrderNotification
+        orders={notificationOrders}
+        onAccept={(orderId) =>
+          setNotificationOrders((prev) => prev.filter((o) => o.id !== orderId))
+        }
+        onDecline={(orderId) =>
+          setNotificationOrders((prev) => prev.filter((o) => o.id !== orderId))
+        }
+      />
     </div>
   );
 }
