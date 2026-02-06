@@ -5,6 +5,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { RealtimeProvider } from "@/contexts/RealtimeContext";
+import { GlobalOrderNotificationHost } from "@/components/pos/GlobalOrderNotificationHost";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -107,6 +108,7 @@ export default function RootLayout({
               pauseOnHover
               theme="light"
             />
+            <GlobalOrderNotificationHost />
           </RealtimeProvider>
         </ThemeProvider>
       </body>

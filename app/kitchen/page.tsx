@@ -12,34 +12,14 @@ import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useRealtime } from "@/contexts/RealtimeContext";
-import { BoltFoodOrderNotification } from "@/components/pos/BoltFoodOrderNotification";
 
 type OrderStatusFilter = "all" | "pending" | "preparing" | "ready" | "completed";
-
-type NotificationOrder = {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerPhone: string;
-  deliveryAddress: string;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-  }>;
-  subtotal: number;
-  deliveryFee: number;
-  total: number;
-  estimatedDeliveryTime: number;
-  createdAt: string;
-};
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>("all");
-  const [notificationOrders, setNotificationOrders] = useState<NotificationOrder[]>([]);
   const { subscribeToOrders } = useRealtime();
 
   // Map UI order status to DB status enum used in `orders` and `order_timeline`
@@ -113,8 +93,9 @@ export default function KitchenPage() {
           )
         `
         )
-        // Show orders that are pending, paid, or already in the kitchen workflow
+        // Only show orders that have been paid and are in the kitchen workflow
         // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
+        .eq("payment_status", "paid")
         .in("status", ["pending", "paid", "preparing", "ready", "dispatched", "delivered"])
         .gte("created_at", startIso)
         .lte("created_at", endIso)
@@ -306,53 +287,6 @@ export default function KitchenPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const queueNotificationForOrder = useCallback(async (orderId: string) => {
-    // Fetch a single order with related data to build the notification payload
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        `
-        *,
-        customers (*),
-        order_items (*)
-      `
-      )
-      .eq("id", orderId)
-      .single();
-
-    if (error || !data) return;
-
-    const row: any = data;
-
-    const items = Array.isArray(row.order_items)
-      ? row.order_items.map((item: any) => ({
-          name: (item.item_name as string) ?? "Item",
-          quantity: Number(item.quantity ?? 1),
-          price: Number(item.unit_price ?? 0),
-        }))
-      : [];
-
-    const notificationOrder: NotificationOrder = {
-      id: row.id as string,
-      orderNumber: row.order_number as string,
-      customerName: (row.customer_name as string) ?? "Customer",
-      customerPhone: (row.customer_phone as string) ?? "",
-      deliveryAddress: (row.delivery_address as string) ?? "",
-      items,
-      subtotal: Number(row.subtotal ?? 0),
-      deliveryFee: Number(row.delivery_fee ?? 0),
-      total: Number(row.total_amount ?? 0),
-      estimatedDeliveryTime: 30,
-      createdAt: row.created_at as string,
-    };
-
-    setNotificationOrders((prev) => {
-      // Avoid duplicates
-      if (prev.some((o) => o.id === notificationOrder.id)) return prev;
-      return [...prev, notificationOrder];
-    });
-  }, []);
-
   // Subscribe to global realtime updates for orders
   useEffect(() => {
     const unsubscribe = subscribeToOrders(async (payload: any) => {
@@ -363,46 +297,23 @@ export default function KitchenPage() {
       if (!newRow) return;
 
       // Only react to orders that are paid or already in the kitchen workflow
-      // Database enum: pending, paid, preparing, ready, dispatched, delivered, cancelled
-      const status = newRow.status as
+      // React only when payment_status becomes 'paid' (or a paid order changes)
+      const paymentStatus = (newRow.payment_status || "pending") as
         | "pending"
         | "paid"
-        | "preparing"
-        | "ready"
-        | "dispatched"
-        | "delivered"
-        | "cancelled"
         | string;
 
-      const isActiveStatus =
-        status === "paid" ||
-        status === "preparing" ||
-        status === "ready" ||
-        status === "dispatched" ||
-        status === "delivered";
+      const wasPreviouslyPaid =
+        (oldRow?.payment_status as "pending" | "paid" | string | null) === "paid";
+      const isNowPaid = paymentStatus === "paid";
 
-      if (!isActiveStatus) {
-        return;
+      if (isNowPaid && !wasPreviouslyPaid) {
+        fetchOrders();
       }
-
-      // If an order just became paid (either new INSERT with paid status, or UPDATE from non-paid to paid), queue a notification.
-      const wasPreviouslyPaid = oldRow?.status === "paid";
-      const isNowPaid = status === "paid";
-      const isNewOrder = eventType === "INSERT";
-
-      // Show notification if:
-      // 1. It's a new order (INSERT) with status "paid", OR
-      // 2. It's an UPDATE where status changed from non-paid to "paid"
-      if (isNowPaid && (isNewOrder || !wasPreviouslyPaid)) {
-        await queueNotificationForOrder(newRow.id as string);
-      }
-
-      // Re-fetch today's relevant orders so the grid stays up to date
-      fetchOrders();
     });
 
     return unsubscribe;
-  }, [subscribeToOrders, fetchOrders, queueNotificationForOrder]);
+  }, [subscribeToOrders, fetchOrders]);
 
   // Filter and search orders
   const filteredOrders = useMemo(() => {
@@ -622,16 +533,6 @@ export default function KitchenPage() {
           )}
         </div>
       </div>
-
-      <BoltFoodOrderNotification
-        orders={notificationOrders}
-        onAccept={(orderId) =>
-          setNotificationOrders((prev) => prev.filter((o) => o.id !== orderId))
-        }
-        onDecline={(orderId) =>
-          setNotificationOrders((prev) => prev.filter((o) => o.id !== orderId))
-        }
-      />
     </div>
   );
 }

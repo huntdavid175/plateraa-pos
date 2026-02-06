@@ -13,7 +13,6 @@ import {
 } from "@/types";
 import { MenuGrid } from "@/components/pos/MenuGrid";
 import { OrderSidebar } from "@/components/pos/OrderSidebar";
-import { BoltFoodOrderNotification } from "@/components/pos/BoltFoodOrderNotification";
 import { toast } from "react-toastify";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Navigation } from "@/components/shared/Navigation";
@@ -37,7 +36,6 @@ export default function POSPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [tableNumber, setTableNumber] = useState<string>("");
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
-  const [boltFoodOrders, setBoltFoodOrders] = useState<any[]>([]);
 
   const TAX_RATE = 0.1; // 10% tax
 
@@ -129,7 +127,7 @@ export default function POSPage() {
     [institutionCode]
   );
 
-  // Fetch categories and menu items for the resolved institution
+  // Fetch categories and menu items for the resolved institution (from server via ISR API)
   useEffect(() => {
     if (!institutionId) return;
 
@@ -137,115 +135,28 @@ export default function POSPage() {
       try {
         setIsLoadingMenu(true);
 
-        // Fetch categories
-        const { data: categoryRows, error: categoryError } = await supabase
-          .from("menu_categories")
-          .select("*")
-          .eq("institution_id", institutionId)
-          .eq("is_visible", true)
-          .order("sort_order");
+        const params = new URLSearchParams({ institution_id: institutionId });
+        const res = await fetch(`/api/menu?${params.toString()}`);
 
-        if (categoryError) {
-          console.error("Error fetching menu categories", categoryError);
-          toast.error("Failed to load menu categories");
-        } else if (categoryRows) {
-          const mappedCategories: MenuCategory[] = categoryRows.map(
-            (cat: any) => ({
-              id: cat.id,
-              name: cat.name,
-              slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, "-"),
-              icon: cat.icon || undefined,
-              display_order: cat.sort_order ?? 0,
-              created_at: cat.created_at,
-            })
-          );
-          setCategories(mappedCategories);
-        }
-
-        // Fetch menu items with variants and addons
-        const { data: itemRows, error: itemError } = await supabase
-          .from("menu_items")
-          .select(
-            `
-            *,
-            menu_item_variants (id, name, price, sort_order, is_default),
-            menu_item_addons (id, name, price, sort_order, is_available)
-          `
-          )
-          .eq("institution_id", institutionId)
-          .eq("is_available", true)
-          .order("created_at", { ascending: true });
-
-        if (itemError) {
-          console.error("Error fetching menu items", itemError);
-          toast.error("Failed to load menu items");
-          return;
-        }
-
-        if (!itemRows) {
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => ({}));
+          console.error("Error fetching menu via API", errorBody);
+          toast.error("Failed to load menu");
           setMenuItems([]);
+          setCategories([]);
           return;
         }
 
-        const mappedItems: MenuItem[] = itemRows.map((row: any) => {
-          let variations: Variation[] | undefined;
+        const data: { categories: MenuCategory[]; items: MenuItem[] } =
+          await res.json();
 
-          if (row.menu_item_variants && row.menu_item_variants.length > 0) {
-            // Map Supabase variants into a single variation group called "Variant"
-            const basePrice = Number(row.price ?? 0);
-            variations = [
-              {
-                id: `var-${row.id}`,
-                name: "Variant",
-                required: true,
-                options: row.menu_item_variants
-                  .sort(
-                    (a: any, b: any) =>
-                      (a.sort_order ?? 0) - (b.sort_order ?? 0)
-                  )
-                  .map((variant: any) => ({
-                    id: variant.id,
-                    name: variant.name,
-                    price_modifier:
-                      Number(variant.price ?? basePrice) - basePrice,
-                  })),
-              },
-            ];
-          }
-
-          const add_ons =
-            row.menu_item_addons && row.menu_item_addons.length > 0
-              ? row.menu_item_addons
-                  .filter((addon: any) => addon.is_available !== false)
-                  .sort(
-                    (a: any, b: any) =>
-                      (a.sort_order ?? 0) - (b.sort_order ?? 0)
-                  )
-                  .map((addon: any) => ({
-                    id: addon.id,
-                    name: addon.name,
-                    price: Number(addon.price ?? 0),
-                  }))
-              : undefined;
-
-          return {
-            id: row.id,
-            name: row.name,
-            description: row.description ?? undefined,
-            price: Number(row.price ?? 0),
-            image_url: row.image_url ?? undefined,
-            category_id: row.category_id,
-            is_available: row.is_available ?? true,
-            is_featured: row.is_featured ?? false,
-            preparation_time: row.preparation_time ?? undefined,
-            variations,
-            add_ons,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-          } as MenuItem;
-        });
-
-        setMenuItems(mappedItems);
+        setCategories(data.categories || []);
+        setMenuItems(data.items || []);
+      } catch (error) {
+        console.error("Unexpected error fetching menu", error);
+        toast.error("Failed to load menu");
+        setMenuItems([]);
+        setCategories([]);
       } finally {
         setIsLoadingMenu(false);
       }
@@ -253,97 +164,6 @@ export default function POSPage() {
 
     fetchMenuData();
   }, [institutionId]);
-
-  // Simulate incoming Bolt Food orders (for demo purposes)
-  useEffect(() => {
-    // Simulate multiple Bolt Food orders coming in
-    const timers: NodeJS.Timeout[] = [];
-    
-    // First order after 5 seconds
-    timers.push(setTimeout(() => {
-      setBoltFoodOrders((prev) => [
-        ...prev,
-        {
-          id: `bolt-${Date.now()}`,
-          orderNumber: `BF${Math.floor(Math.random() * 10000)}`,
-          customerName: "Kwame Mensah",
-          customerPhone: "+233 24 123 4567",
-          deliveryAddress: "123 Spintex Road, Accra",
-          items: [
-            { name: "Onigiri (Large)", quantity: 2, price: 18.9 },
-            { name: "Tom Yum Soup (Hot)", quantity: 1, price: 9.5 },
-          ],
-          subtotal: 47.3,
-          deliveryFee: 5.0,
-          total: 52.3,
-          estimatedDeliveryTime: 25,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }, 5000));
-
-    // Second order after 7 seconds
-    timers.push(setTimeout(() => {
-      setBoltFoodOrders((prev) => [
-        ...prev,
-        {
-          id: `bolt-${Date.now()}`,
-          orderNumber: `BF${Math.floor(Math.random() * 10000)}`,
-          customerName: "Ama Asante",
-          customerPhone: "+233 24 987 6543",
-          deliveryAddress: "45 East Legon, Accra",
-          items: [
-            { name: "Iced Coffee (Large)", quantity: 2, price: 6.0 },
-            { name: "Dumplings (12 pieces)", quantity: 1, price: 23.0 },
-          ],
-          subtotal: 35.0,
-          deliveryFee: 5.0,
-          total: 40.0,
-          estimatedDeliveryTime: 20,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }, 7000));
-
-    // Third order after 9 seconds
-    timers.push(setTimeout(() => {
-      setBoltFoodOrders((prev) => [
-        ...prev,
-        {
-          id: `bolt-${Date.now()}`,
-          orderNumber: `BF${Math.floor(Math.random() * 10000)}`,
-          customerName: "Kofi Adjei",
-          customerPhone: "+233 24 555 1234",
-          deliveryAddress: "78 Osu, Oxford Street, Accra",
-          items: [
-            { name: "Songpyeon", quantity: 3, price: 4.9 },
-            { name: "Miso Soup", quantity: 2, price: 5.5 },
-          ],
-          subtotal: 25.7,
-          deliveryFee: 5.0,
-          total: 30.7,
-          estimatedDeliveryTime: 18,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }, 9000));
-
-    return () => {
-      timers.forEach((timer) => clearTimeout(timer));
-    };
-  }, []);
-
-  const handleAcceptBoltOrder = useCallback((orderId: string) => {
-    console.log("Bolt Food order accepted:", orderId);
-    setBoltFoodOrders((prev) => prev.filter((order) => order.id !== orderId));
-    toast.success("Order Accepted: Bolt Food order has been accepted and sent to kitchen");
-  }, []);
-
-  const handleDeclineBoltOrder = useCallback((orderId: string) => {
-    console.log("Bolt Food order declined:", orderId);
-    setBoltFoodOrders((prev) => prev.filter((order) => order.id !== orderId));
-    toast.error("Order Declined: Bolt Food order has been declined");
-  }, []);
 
   // Generate unique ID for order items
   const generateOrderItemId = () => {
@@ -637,34 +457,6 @@ export default function POSPage() {
           >
             Logout / Change Restaurant
           </button>
-          <button
-            onClick={() => {
-              setBoltFoodOrders((prev) => [
-                ...prev,
-                {
-                  id: `bolt-${Date.now()}`,
-                  orderNumber: `BF${Math.floor(Math.random() * 10000)}`,
-                  customerName: "Kwame Mensah",
-                  customerPhone: "+233 24 123 4567",
-                  deliveryAddress: "123 Spintex Road, Accra",
-                  items: [
-                    { name: "Onigiri (Large)", quantity: 2, price: 18.9 },
-                    { name: "Tom Yum Soup (Hot)", quantity: 1, price: 9.5 },
-                    { name: "Iced Coffee (Large)", quantity: 1, price: 6.0 },
-                  ],
-                  subtotal: 53.3,
-                  deliveryFee: 5.0,
-                  total: 58.3,
-                  estimatedDeliveryTime: 25,
-                  createdAt: new Date().toISOString(),
-                },
-              ]);
-            }}
-            className="px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
-            title="Test Bolt Food Order"
-          >
-            Test Bolt Order
-          </button>
           <ThemeToggle />
           <div className="text-sm text-muted-foreground">
             Cashier: Admin
@@ -735,12 +527,6 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* Bolt Food Order Notification */}
-      <BoltFoodOrderNotification
-        orders={boltFoodOrders}
-        onAccept={handleAcceptBoltOrder}
-        onDecline={handleDeclineBoltOrder}
-      />
     </div>
   );
 }
