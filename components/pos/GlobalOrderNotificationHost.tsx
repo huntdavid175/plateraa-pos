@@ -74,24 +74,38 @@ export function GlobalOrderNotificationHost() {
 
   useEffect(() => {
     const unsubscribe = subscribeToOrders(async (payload: any) => {
-      const eventType = payload.eventType;
+      const eventType = payload.eventType ?? payload.type;
       const newRow = payload.new as any | null;
       const oldRow = payload.old as any | null;
 
       if (!newRow) return;
 
-      // Only notify when payment_status becomes 'paid'
-      const paymentStatus = (newRow.payment_status || "pending") as
+      // Normalize payment_status values
+      const newPaymentStatus = (newRow.payment_status || "pending") as
         | "pending"
         | "paid"
         | string;
+      const oldPaymentStatus = (oldRow?.payment_status || null) as
+        | "pending"
+        | "paid"
+        | string
+        | null;
 
-      const wasPreviouslyPaid =
-        (oldRow?.payment_status as "pending" | "paid" | string | null) === "paid";
-      const isNowPaid = paymentStatus === "paid";
-      const isNewOrder = eventType === "INSERT";
+      const isInsert = eventType === "INSERT";
+      const isUpdate = eventType === "UPDATE";
 
-      if (isNowPaid && (isNewOrder || !wasPreviouslyPaid)) {
+      // INSERT: fire only if the newly inserted row is paid
+      if (isInsert && newPaymentStatus === "paid") {
+        await queueNotificationForOrder(newRow.id as string);
+        return;
+      }
+
+      // UPDATE: fire only on an actual transition from non-paid -> paid
+      if (
+        isUpdate &&
+        oldPaymentStatus !== "paid" &&
+        newPaymentStatus === "paid"
+      ) {
         await queueNotificationForOrder(newRow.id as string);
       }
     });

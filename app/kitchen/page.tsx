@@ -290,24 +290,38 @@ export default function KitchenPage() {
   // Subscribe to global realtime updates for orders
   useEffect(() => {
     const unsubscribe = subscribeToOrders(async (payload: any) => {
-      const eventType = payload.eventType; // 'INSERT' or 'UPDATE' or 'DELETE'
+      const eventType = payload.eventType ?? payload.type; // 'INSERT' or 'UPDATE' or 'DELETE'
       const newRow = payload.new as any | null;
       const oldRow = payload.old as any | null;
 
       if (!newRow) return;
 
-      // Only react to orders that are paid or already in the kitchen workflow
-      // React only when payment_status becomes 'paid' (or a paid order changes)
-      const paymentStatus = (newRow.payment_status || "pending") as
+      // React only when payment_status truly transitions to 'paid'
+      const newPaymentStatus = (newRow.payment_status || "pending") as
         | "pending"
         | "paid"
         | string;
+      const oldPaymentStatus = (oldRow?.payment_status || null) as
+        | "pending"
+        | "paid"
+        | string
+        | null;
 
-      const wasPreviouslyPaid =
-        (oldRow?.payment_status as "pending" | "paid" | string | null) === "paid";
-      const isNowPaid = paymentStatus === "paid";
+      const isInsert = eventType === "INSERT";
+      const isUpdate = eventType === "UPDATE";
 
-      if (isNowPaid && !wasPreviouslyPaid) {
+      // INSERT: refresh only if the inserted order is already paid
+      if (isInsert && newPaymentStatus === "paid") {
+        fetchOrders();
+        return;
+      }
+
+      // UPDATE: refresh only when payment_status flips from non-paid to paid
+      if (
+        isUpdate &&
+        oldPaymentStatus !== "paid" &&
+        newPaymentStatus === "paid"
+      ) {
         fetchOrders();
       }
     });
