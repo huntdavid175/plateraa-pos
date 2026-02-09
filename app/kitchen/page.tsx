@@ -301,11 +301,6 @@ export default function KitchenPage() {
         | "pending"
         | "paid"
         | string;
-      const oldPaymentStatus = (oldRow?.payment_status || null) as
-        | "pending"
-        | "paid"
-        | string
-        | null;
 
       const isInsert = eventType === "INSERT";
       const isUpdate = eventType === "UPDATE";
@@ -317,9 +312,11 @@ export default function KitchenPage() {
       }
 
       // UPDATE: refresh only when payment_status flips from non-paid to paid
+      // We require a valid old row; if Supabase is not sending `old`, this will not fire.
       if (
         isUpdate &&
-        oldPaymentStatus !== "paid" &&
+        oldRow &&
+        oldRow.payment_status !== "paid" &&
         newPaymentStatus === "paid"
       ) {
         fetchOrders();
