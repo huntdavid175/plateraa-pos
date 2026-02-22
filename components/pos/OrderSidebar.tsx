@@ -37,7 +37,7 @@ interface OrderSidebarProps {
   onPlaceOrder: (
     paymentMethod: "cash" | "card" | "mobile_money"
   ) => Promise<void>;
-  onSendPaymentLink: (phoneNumber?: string) => Promise<void>;
+  onSendPaymentLink: (phoneNumber?: string, serviceProvider?: "MTN" | "Vodafone" | "Airtel") => Promise<void>;
 }
 
 export function OrderSidebar({
@@ -62,6 +62,7 @@ export function OrderSidebar({
   >(null);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [customerPhone, setCustomerPhone] = useState<string>("");
+  const [serviceProvider, setServiceProvider] = useState<"MTN" | "Vodafone" | "Airtel">("MTN");
   const [mobileDeliveryAddress, setMobileDeliveryAddress] =
     useState<string>("");
 
@@ -99,11 +100,12 @@ export function OrderSidebar({
     if (!canFinalizeMobilePayment) return;
 
     try {
-      await onSendPaymentLink(customerPhone);
+      await onSendPaymentLink(customerPhone, serviceProvider);
       // Reset form after successful submission
       setShowCustomerForm(false);
       setSelectedPaymentMethod(null);
       setCustomerPhone("");
+      setServiceProvider("MTN");
       setMobileDeliveryAddress("");
     } catch (error) {
       console.error("Error processing payment:", error);
@@ -278,6 +280,51 @@ export function OrderSidebar({
           </SheetHeader>
 
           <div className="flex-1 overflow-auto px-6 py-6 space-y-4">
+            {/* Service Provider - Tabs */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">
+                Mobile Network <span className="text-destructive">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setServiceProvider("MTN")}
+                  className={cn(
+                    "h-12 px-4 rounded-md border-2 text-base font-medium transition-all touch-manipulation",
+                    serviceProvider === "MTN"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-input hover:border-primary/50"
+                  )}
+                >
+                  MTN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServiceProvider("Vodafone")}
+                  className={cn(
+                    "h-12 px-4 rounded-md border-2 text-base font-medium transition-all touch-manipulation",
+                    serviceProvider === "Vodafone"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-input hover:border-primary/50"
+                  )}
+                >
+                  Vodafone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServiceProvider("Airtel")}
+                  className={cn(
+                    "h-12 px-4 rounded-md border-2 text-base font-medium transition-all touch-manipulation",
+                    serviceProvider === "Airtel"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-input hover:border-primary/50"
+                  )}
+                >
+                  Airtel
+                </button>
+              </div>
+            </div>
+
             {/* Mobile Number */}
             <div>
               <label

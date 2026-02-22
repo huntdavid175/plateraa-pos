@@ -389,7 +389,10 @@ export default function POSPage() {
   );
 
   // Send payment link
-  const handleSendPaymentLink = useCallback(async (phoneNumber?: string) => {
+  const handleSendPaymentLink = useCallback(async (
+    phoneNumber?: string,
+    serviceProvider: "MTN" | "Vodafone" | "Airtel" = "MTN"
+  ) => {
     if (!institutionId) {
       toast.error("Institution not connected: Please connect a restaurant");
       return;
@@ -428,7 +431,7 @@ export default function POSPage() {
         const customerAddress = customer?.address || deliveryAddress;
 
         // Create order with payment_status = 'pending' (will be updated when payment is confirmed)
-        const response = await fetch("/api/orders", {
+        const orderResponse = await fetch("/api/orders", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -461,8 +464,8 @@ export default function POSPage() {
           }),
         });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json().catch(() => ({}));
         console.error("Error creating order:", errorData);
         toast.error(
           errorData.error || "Failed to create order: Please try again"
@@ -470,11 +473,38 @@ export default function POSPage() {
         return;
       }
 
-      const data = await response.json();
+      const orderData = await orderResponse.json();
+      const orderId = orderData.order.id;
+      const orderNumber = orderData.order.order_number;
 
-      // TODO: Generate and send payment link via payment gateway
-      // For now, we'll just create the order with payment_status = 'pending'
-      // The payment link generation should be handled by a payment gateway integration
+      // Initiate payment via Moolre
+      const paymentResponse = await fetch("/api/payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumber: phoneNumber,
+          amount: total,
+          serviceProvider: serviceProvider,
+          externalRef: orderId, // Use order ID as external reference
+        }),
+      });
+
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json().catch(() => ({}));
+        console.error("Error initiating payment:", errorData);
+        toast.error(
+          errorData.error || "Failed to initiate payment. Order created but payment not processed."
+        );
+        // Order was created, so we still show success but warn about payment
+        toast.warning(
+          `Order ${orderNumber} created. Please process payment manually.`
+        );
+        return;
+      }
+
+      const paymentData = await paymentResponse.json();
 
       // Clear the cart after successful order creation
       setOrderItems([]);
@@ -483,7 +513,7 @@ export default function POSPage() {
       setDeliveryAddress("");
 
       toast.success(
-        `Order ${data.order.order_number} created. Payment link will be sent shortly.`
+        `Order ${orderNumber} created. Payment request sent to ${phoneNumber} via ${serviceProvider}.`
       );
     } catch (error) {
       console.error("Unexpected error sending payment link:", error);

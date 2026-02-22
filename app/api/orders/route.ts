@@ -195,9 +195,9 @@ export async function POST(req: NextRequest) {
       attempts++;
     }
 
-    // Determine initial status and payment_status based on payment method
+    // Determine payment_status based on payment method
     // Cash payments are marked as 'paid', others start as 'pending'
-    const initialStatus = payment_method === "cash" ? "paid" : "pending";
+    // Order status is always 'pending' initially (will be updated in kitchen)
     const paymentStatus = payment_method === "cash" ? "paid" : "pending";
 
     // Calculate delivery_fee if not provided (0 for pickup/dine-in)
@@ -220,9 +220,9 @@ export async function POST(req: NextRequest) {
       subtotal: subtotal,
       delivery_fee: finalDeliveryFee,
       total_amount: total,
-      status: initialStatus, // Database enum: pending, paid, preparing, ready, delivered, cancelled
+      status: "pending", // Always start as 'pending' (will be updated in kitchen workflow)
       payment_method: payment_method || null,
-      payment_status: paymentStatus, // Mark as 'paid' for cash payments
+      payment_status: paymentStatus, // Mark as 'paid' for cash payments, 'pending' for others
       notes: notes || null,
     };
 
@@ -316,9 +316,9 @@ export async function POST(req: NextRequest) {
       .from("order_timeline")
       .insert({
         order_id: order.id,
-        event_type: initialStatus,
+        event_type: "pending",
         event_description:
-          initialStatus === "paid"
+          paymentStatus === "paid"
             ? `Order created from POS (Payment received via ${payment_method || "cash"})`
             : "Order created from POS",
       });
