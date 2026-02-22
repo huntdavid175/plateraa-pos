@@ -266,8 +266,8 @@ export default function KitchenPage() {
           delivery_address: row.delivery_address ?? undefined,
           items,
           subtotal: Number(row.subtotal ?? 0),
-          tax_rate: Number(row.tax_rate ?? 0),
-          tax_amount: Number(row.tax_amount ?? 0),
+          tax_rate: 0, // Not in actual schema, set to 0
+          tax_amount: 0, // Not in actual schema, set to 0
           total: Number(row.total_amount ?? row.total ?? 0),
           status: mappedStatus,
           payment_method: derivedPaymentMethod,

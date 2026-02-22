@@ -37,8 +37,6 @@ export default function POSPage() {
   const [tableNumber, setTableNumber] = useState<string>("");
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
 
-  const TAX_RATE = 0.1; // 10% tax
-
   const handleInstitutionLogout = useCallback(() => {
     try {
       if (typeof window !== "undefined") {
@@ -287,70 +285,116 @@ export default function POSPage() {
   // Place order
   const handlePlaceOrder = useCallback(
     async (paymentMethod: "cash" | "card" | "mobile_money") => {
+      if (!institutionId) {
+        toast.error("Institution not connected: Please connect a restaurant");
+        return;
+      }
+
       if (orderItems.length === 0) {
         toast.error("Empty Order: Please add items to your order");
         return;
       }
-
-      // For cash orders, customer is optional - create default if not provided
-      const orderCustomer = customer || {
-        id: "walk-in",
-        name: "Walk-in Customer",
-        phone: "",
-        created_at: new Date().toISOString(),
-      };
 
       if (orderType === "delivery" && !deliveryAddress) {
         toast.error("Delivery Address Required: Please enter delivery address");
         return;
       }
 
-      // Simulate order placement (no database)
-      const subtotal = orderItems.reduce(
-        (sum, item) => sum + item.subtotal,
-        0
-      );
-      const taxAmount = subtotal * TAX_RATE;
-      const total = subtotal + taxAmount;
+      try {
+        // Calculate totals (no tax, just subtotal + delivery fee)
+        const subtotal = orderItems.reduce(
+          (sum, item) => sum + item.subtotal,
+          0
+        );
+        
+        // Calculate delivery fee (0 for pickup/dine-in, you can add logic for delivery)
+        const deliveryFee = orderType === "delivery" ? 0 : 0; // TODO: Calculate based on distance/zone
+        
+        const total = subtotal + deliveryFee;
 
-      // Generate order number
-      const orderNumber = `ORD-${Date.now()}`;
+        // Prepare customer data
+        // For cash payments, phone number is optional
+        const customerName = customer?.name || "Walk-in Customer";
+        const customerPhone = customer?.phone || (paymentMethod === "cash" ? "" : "");
+        const customerEmail = customer?.email;
+        const customerAddress = customer?.address || deliveryAddress;
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+        // Create order via API
+        const response = await fetch("/api/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            institution_id: institutionId,
+            order_type: orderType,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            customer_email: customerEmail,
+            customer_address: customerAddress,
+            delivery_address: deliveryAddress || null,
+            items: orderItems.map((item) => ({
+              menu_item_id: item.menu_item_id,
+              menu_item: {
+                name: item.menu_item.name,
+              },
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.subtotal,
+              selected_variations: item.selected_variations,
+              selected_add_ons: item.selected_add_ons,
+              special_instructions: item.special_instructions,
+            })),
+            subtotal,
+            delivery_fee: deliveryFee,
+            total,
+            payment_method: paymentMethod,
+            channel: "pos", // POS orders always come from 'pos' channel
+          }),
+        });
 
-      console.log("Order placed:", {
-        order_number: orderNumber,
-        order_type: orderType,
-        customer: orderCustomer.name,
-        items: orderItems,
-        total,
-        payment_method: paymentMethod,
-      });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Error creating order:", errorData);
+          toast.error(
+            errorData.error || "Failed to create order: Please try again"
+          );
+          return;
+        }
 
-      // Simulate sending to kitchen
-      console.log("Order sent to kitchen:", orderNumber);
+        const data = await response.json();
 
-      // Clear cart
-      setOrderItems([]);
-      setCustomer(null);
-      setTableNumber("");
-      setDeliveryAddress("");
+        // Clear cart after successful order creation
+        setOrderItems([]);
+        setCustomer(null);
+        setTableNumber("");
+        setDeliveryAddress("");
 
-      toast.success("Order created and sent to kitchen");
+        toast.success(
+          `Order ${data.order.order_number} created and sent to kitchen`
+        );
+      } catch (error) {
+        console.error("Unexpected error placing order:", error);
+        toast.error("Failed to create order: Please try again");
+      }
     },
     [
+      institutionId,
       orderItems,
       customer,
       orderType,
       tableNumber,
       deliveryAddress,
-      TAX_RATE,
     ]
   );
 
   // Send payment link
   const handleSendPaymentLink = useCallback(async (phoneNumber?: string) => {
+    if (!institutionId) {
+      toast.error("Institution not connected: Please connect a restaurant");
+      return;
+    }
+
     if (orderItems.length === 0) {
       toast.error("Invalid Order: Please add items to the order");
       return;
@@ -361,30 +405,98 @@ export default function POSPage() {
       return;
     }
 
-    // Simulate payment link generation
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.subtotal,
-      0
-    );
-    const taxAmount = subtotal * TAX_RATE;
-    const total = subtotal + taxAmount;
+    if (orderType === "delivery" && !deliveryAddress) {
+      toast.error("Delivery Address Required: Please enter delivery address");
+      return;
+    }
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        // Calculate totals (no tax, just subtotal + delivery fee)
+        const subtotal = orderItems.reduce(
+          (sum, item) => sum + item.subtotal,
+          0
+        );
+        
+        // Calculate delivery fee (0 for pickup/dine-in, you can add logic for delivery)
+        const deliveryFee = orderType === "delivery" ? 0 : 0; // TODO: Calculate based on distance/zone
+        
+        const total = subtotal + deliveryFee;
 
-    // Generate payment link (mock)
-    const paymentLink = `https://pay.example.com/pay/${Date.now()}`;
-    console.log("Payment link generated:", paymentLink);
-    console.log("Sending to phone:", phoneNumber);
+        // Prepare customer data
+        const customerName = customer?.name || "Customer";
+        const customerEmail = customer?.email;
+        const customerAddress = customer?.address || deliveryAddress;
 
-    // Clear the cart after successful payment link sending
-    setOrderItems([]);
-    setCustomer(null);
-    setTableNumber("");
-    setDeliveryAddress("");
+        // Create order with payment_status = 'pending' (will be updated when payment is confirmed)
+        const response = await fetch("/api/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            institution_id: institutionId,
+            order_type: orderType,
+            customer_name: customerName,
+            customer_phone: phoneNumber,
+            customer_email: customerEmail,
+            customer_address: customerAddress,
+            delivery_address: deliveryAddress || null,
+            items: orderItems.map((item) => ({
+              menu_item_id: item.menu_item_id,
+              menu_item: {
+                name: item.menu_item.name,
+              },
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.subtotal,
+              selected_variations: item.selected_variations,
+              selected_add_ons: item.selected_add_ons,
+              special_instructions: item.special_instructions,
+            })),
+            subtotal,
+            delivery_fee: deliveryFee,
+            total,
+            payment_method: "mobile_money",
+            channel: "pos", // POS orders always come from 'pos' channel
+          }),
+        });
 
-    toast.success("Order created and payment link sent");
-  }, [orderItems, TAX_RATE]);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Error creating order:", errorData);
+        toast.error(
+          errorData.error || "Failed to create order: Please try again"
+        );
+        return;
+      }
+
+      const data = await response.json();
+
+      // TODO: Generate and send payment link via payment gateway
+      // For now, we'll just create the order with payment_status = 'pending'
+      // The payment link generation should be handled by a payment gateway integration
+
+      // Clear the cart after successful order creation
+      setOrderItems([]);
+      setCustomer(null);
+      setTableNumber("");
+      setDeliveryAddress("");
+
+      toast.success(
+        `Order ${data.order.order_number} created. Payment link will be sent shortly.`
+      );
+    } catch (error) {
+      console.error("Unexpected error sending payment link:", error);
+      toast.error("Failed to create order: Please try again");
+    }
+  }, [
+    institutionId,
+    orderItems,
+    customer,
+    orderType,
+    tableNumber,
+    deliveryAddress,
+  ]);
 
   if (isCheckingInstitution) {
     return (
@@ -485,7 +597,7 @@ export default function POSPage() {
             customer={customer || undefined}
             tableNumber={tableNumber}
             deliveryAddress={deliveryAddress}
-            taxRate={TAX_RATE}
+            deliveryFee={orderType === "delivery" ? 0 : 0}
             onOrderTypeChange={setOrderType}
             onCustomerChange={setCustomer}
             onTableNumberChange={setTableNumber}

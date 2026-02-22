@@ -26,7 +26,7 @@ interface OrderSidebarProps {
   customer?: Customer;
   tableNumber?: string;
   deliveryAddress?: string;
-  taxRate: number;
+  deliveryFee?: number; // Optional delivery fee
   onOrderTypeChange: (type: OrderType) => void;
   onCustomerChange: (customer: Customer | null) => void;
   onTableNumberChange: (tableNumber: string) => void;
@@ -46,7 +46,7 @@ export function OrderSidebar({
   customer,
   tableNumber,
   deliveryAddress,
-  taxRate,
+  deliveryFee = 0,
   onOrderTypeChange,
   onCustomerChange,
   onTableNumberChange,
@@ -66,8 +66,7 @@ export function OrderSidebar({
     useState<string>("");
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const taxAmount = subtotal * taxRate;
-  const total = subtotal + taxAmount;
+  const total = subtotal + deliveryFee;
 
   // Can continue to next step (either place order for cash, or show form for mobile)
   const canContinue = orderItems.length > 0 && selectedPaymentMethod !== null;
@@ -180,12 +179,12 @@ export function OrderSidebar({
               <span className="text-muted-foreground">Subtotal:</span>
               <span className="font-medium">₵{subtotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm md:text-xs lg:text-sm">
-              <span className="text-muted-foreground">
-                Taxes ({Math.round(taxRate * 100)}%):
-              </span>
-              <span className="font-medium">₵{taxAmount.toLocaleString()}</span>
-            </div>
+            {deliveryFee > 0 && (
+              <div className="flex justify-between text-sm md:text-xs lg:text-sm">
+                <span className="text-muted-foreground">Delivery Fee:</span>
+                <span className="font-medium">₵{deliveryFee.toLocaleString()}</span>
+              </div>
+            )}
             <Separator />
             <div className="flex justify-between text-lg md:text-base lg:text-lg font-bold">
               <span>Total:</span>
