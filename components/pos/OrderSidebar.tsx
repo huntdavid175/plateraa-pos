@@ -65,6 +65,7 @@ export function OrderSidebar({
   const [serviceProvider, setServiceProvider] = useState<"MTN" | "Vodafone" | "Airtel">("MTN");
   const [mobileDeliveryAddress, setMobileDeliveryAddress] =
     useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
   const total = subtotal + deliveryFee;
@@ -97,9 +98,10 @@ export function OrderSidebar({
   };
 
   const handleFinalizeMobilePayment = async () => {
-    if (!canFinalizeMobilePayment) return;
+    if (!canFinalizeMobilePayment || isProcessingPayment) return;
 
     try {
+      setIsProcessingPayment(true);
       await onSendPaymentLink(customerPhone, serviceProvider);
       // Reset form after successful submission
       setShowCustomerForm(false);
@@ -109,6 +111,8 @@ export function OrderSidebar({
       setMobileDeliveryAddress("");
     } catch (error) {
       console.error("Error processing payment:", error);
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -385,9 +389,9 @@ export function OrderSidebar({
             <Button
               className="w-full bg-primary hover:bg-primary/90 h-12 text-base font-medium"
               onClick={handleFinalizeMobilePayment}
-              disabled={!canFinalizeMobilePayment}
+              disabled={!canFinalizeMobilePayment || isProcessingPayment}
             >
-              Send Payment Link
+              {isProcessingPayment ? "Processing..." : "Send Payment Link"}
             </Button>
           </div>
         </SheetContent>
