@@ -80,11 +80,16 @@ export function GlobalOrderNotificationHost() {
 
       if (!newRow) return;
 
-      // Normalize payment_status values
-      const newPaymentStatus = (newRow.payment_status || "pending") as
+      // Normalize payment_status values – be defensive about missing fields
+      const newPaymentStatus = (newRow.payment_status ?? "pending") as
         | "pending"
         | "paid"
         | string;
+      const oldPaymentStatus = (oldRow?.payment_status ?? null) as
+        | "pending"
+        | "paid"
+        | string
+        | null;
 
       const isInsert = eventType === "INSERT";
       const isUpdate = eventType === "UPDATE";
@@ -95,15 +100,17 @@ export function GlobalOrderNotificationHost() {
         return;
       }
 
-      // UPDATE: fire only on an actual transition from non-paid -> paid
-      // We require a valid old row; if Supabase is not sending `old`, this will not fire.
-      if (
-        isUpdate &&
-        oldRow &&
-        oldRow.payment_status !== "paid" &&
-        newPaymentStatus === "paid"
-      ) {
-        await queueNotificationForOrder(newRow.id as string);
+      // UPDATE: fire only on an actual transition from a non-paid value -> paid.
+      // If we don't have a reliable old payment_status, ignore the update so we
+      // don't trigger on unrelated changes like status updates.
+      if (isUpdate && oldPaymentStatus !== null) {
+        const paymentStatusChanged = oldPaymentStatus !== newPaymentStatus;
+        const transitionedToPaid =
+          oldPaymentStatus !== "paid" && newPaymentStatus === "paid";
+
+        if (paymentStatusChanged && transitionedToPaid) {
+          await queueNotificationForOrder(newRow.id as string);
+        }
       }
     });
 

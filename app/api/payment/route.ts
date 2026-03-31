@@ -1,42 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
-type ServiceProvider = "MTN" | "Vodafone" | "Airtel";
-
-const SERVICE_PROVIDER_CHANNELS: Record<ServiceProvider, string> = {
-  MTN: "13",
-  Vodafone: "6",
-  Airtel: "7",
-};
+const DEFAULT_REUSABLE = "0";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
     const {
-      phoneNumber,
       amount,
-      serviceProvider,
       externalRef,
+      email,
+      callback,
+      redirect,
+      metadata,
     } = body;
 
     // Validate required fields
-    if (!phoneNumber) {
-      return NextResponse.json(
-        { error: "Phone number is required" },
-        { status: 400 }
-      );
-    }
-
     if (!amount || amount <= 0) {
       return NextResponse.json(
         { error: "Valid amount is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!serviceProvider || !SERVICE_PROVIDER_CHANNELS[serviceProvider as ServiceProvider]) {
-      return NextResponse.json(
-        { error: "Valid service provider is required" },
         { status: 400 }
       );
     }
@@ -61,29 +44,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Clean phone number (remove spaces, ensure it starts with country code)
-    let cleanPhone = phoneNumber.replace(/\s+/g, "");
-    if (cleanPhone.startsWith("0")) {
-      cleanPhone = "233" + cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith("+233")) {
-      cleanPhone = cleanPhone.substring(1);
-    } else if (!cleanPhone.startsWith("233")) {
-      cleanPhone = "233" + cleanPhone;
-    }
+    const callbackUrl =
+      callback || process.env.MOOLRE_CALLBACK_URL || req.nextUrl.origin;
+    const redirectUrl =
+      redirect || process.env.MOOLRE_REDIRECT_URL || req.nextUrl.origin;
 
     // Prepare payment request
     const paymentData = {
       type: 1,
-      channel: SERVICE_PROVIDER_CHANNELS[serviceProvider as ServiceProvider],
-      currency: "GHS",
-      payer: cleanPhone,
       amount: amount.toString(),
+      email: email || "",
       externalref: externalRef,
+      callback: callbackUrl,
+      redirect: redirectUrl,
+      reusable: DEFAULT_REUSABLE,
+      currency: "GHS",
       accountnumber: accountNumber,
+      metadata: metadata || {},
     };
 
     // Call Moolre API
-    const response = await fetch("https://api.moolre.com/open/transact/payment", {
+    const response = await fetch("https://api.moolre.com/embed/link", {
       method: "POST",
       headers: {
         "X-API-USER": username,
@@ -106,9 +87,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("[Payment API] Moolre embed/link response:", responseData);
+
+    const paymentLink =
+      responseData?.data?.authorization_url ||
+      responseData?.data?.link ||
+      responseData?.link ||
+      responseData?.data?.url ||
+      responseData?.url ||
+      null;
+
+    if (!paymentLink) {
+      console.warn(
+        "[Payment API] No payment link found in response. Known fields checked: data.authorization_url, data.link, link, data.url, url"
+      );
+    } else {
+      console.log("[Payment API] Extracted payment link:", paymentLink);
+    }
+
+    // Best-effort: persist generated link on the order when externalRef is order id.
+    if (paymentLink) {
+      const { error: orderUpdateError } = await supabase
+        .from("orders")
+        .update({
+          payment_link: paymentLink,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", externalRef);
+
+      if (orderUpdateError) {
+        console.error("Failed to save payment link on order:", orderUpdateError);
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
+        paymentLink,
         data: responseData,
       },
       { status: 200 }

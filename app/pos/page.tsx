@@ -484,10 +484,16 @@ export default function POSPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phoneNumber: phoneNumber,
           amount: total,
-          serviceProvider: serviceProvider,
           externalRef: orderId, // Use order ID as external reference
+          email: customerEmail || "",
+          metadata: {
+            source: "pos",
+            phoneNumber,
+            serviceProvider,
+            orderNumber,
+            institutionId,
+          },
         }),
       });
 
@@ -505,6 +511,8 @@ export default function POSPage() {
       }
 
       const paymentData = await paymentResponse.json();
+      const paymentLink = paymentData?.paymentLink as string | null;
+      console.log("[POS] Payment API response:", paymentData);
 
       // Clear the cart after successful order creation
       setOrderItems([]);
@@ -512,9 +520,25 @@ export default function POSPage() {
       setTableNumber("");
       setDeliveryAddress("");
 
-      toast.success(
-        `Order ${orderNumber} created. Payment request sent to ${phoneNumber} via ${serviceProvider}.`
-      );
+      if (paymentLink) {
+        console.log("[POS] Payment link received:", paymentLink);
+        toast.success(
+          `Order ${orderNumber} created. Payment link generated for ${phoneNumber}.`
+        );
+      } else {
+        console.warn(
+          "[POS] No payment link returned from /api/payment for order:",
+          {
+            orderId,
+            orderNumber,
+            phoneNumber,
+            serviceProvider,
+          }
+        );
+        toast.warning(
+          `Order ${orderNumber} created, but no payment link was returned.`
+        );
+      }
     } catch (error) {
       console.error("Unexpected error sending payment link:", error);
       toast.error("Failed to create order: Please try again");
